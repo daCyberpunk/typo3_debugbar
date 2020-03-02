@@ -12,7 +12,7 @@
   "license": ["GPL-2.0+"],
   "keywords": ["typo3", "php", "debugging", "debugbar", "cms"],
   "require": {
-    "typo3/cms-core": ">=8.7.0 <9",
+    "typo3/cms-core": "^9.5",
     "maximebf/debugbar": "^1.15"
   },
   "replace": {
