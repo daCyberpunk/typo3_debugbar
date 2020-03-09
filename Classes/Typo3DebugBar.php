@@ -1,5 +1,7 @@
 <?php namespace Konafets\Typo3Debugbar;
 
+use DebugBar\Bridge\Twig\TraceableTwigEnvironment;
+use DebugBar\Bridge\Twig\TwigCollector;
 use DebugBar\DataCollector\ExceptionsCollector;
 use DebugBar\DataCollector\MemoryCollector;
 use DebugBar\DataCollector\MessagesCollector;
@@ -15,11 +17,13 @@ use Konafets\Typo3Debugbar\DataCollectors\SessionCollector;
 use Konafets\Typo3Debugbar\DataCollectors\Typo3Collector;
 use Konafets\Typo3Debugbar\DataCollectors\VarDumpCollector;
 use TYPO3\CMS\Backend\FrontendBackendUserAuthentication;
+use TYPO3\CMS\Core\Authentication\AbstractUserAuthentication;
+use TYPO3\CMS\Core\Configuration\ExtensionConfiguration;
+use TYPO3\CMS\Core\Core\Environment;
 use TYPO3\CMS\Core\Page\PageRenderer;
 use TYPO3\CMS\Core\SingletonInterface;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
 use TYPO3\CMS\Extbase\Object\ObjectManager;
-use TYPO3\CMS\Extensionmanager\Utility\ConfigurationUtility;
 use TYPO3\CMS\Frontend\Controller\TypoScriptFrontendController;
 
 /**
@@ -37,7 +41,6 @@ use TYPO3\CMS\Frontend\Controller\TypoScriptFrontendController;
  */
 class Typo3DebugBar extends DebugBar implements SingletonInterface
 {
-
     const EXTENSION_KEY = 'typo3_debugbar';
 
     /** @var ObjectManager */
@@ -46,38 +49,51 @@ class Typo3DebugBar extends DebugBar implements SingletonInterface
     /** @var array */
     protected $extensionConfiguration;
 
-    /** @var boolean */
+    /** @var bool */
     protected $booted = false;
 
-    /** @var null|boolean */
-    protected $enabled = null;
+    /**
+     * @var int
+     */
+    public $genTime;
+
+    /** @var bool|null */
+    protected $enabled;
 
     /** @var FrontendBackendUserAuthentication */
     protected $backendUser;
 
     /**
+     * devpurpose! remove it later!
+     * @var int
+     */
+    protected $count = 0;
+
+    /**
      * @param FrontendBackendUserAuthentication|null $backendUser
      */
-    public function __construct(FrontendBackendUserAuthentication $backendUser = null)
+    public function __construct(AbstractUserAuthentication $backendUser = null)
     {
         $this->objectManager = GeneralUtility::makeInstance(ObjectManager::class);
-        $this->extensionConfiguration = $this->objectManager
-                                                ->get(ConfigurationUtility::class)
-                                                ->getCurrentConfiguration(self::EXTENSION_KEY);
+
         $this->backendUser = $backendUser;
+        $this->boot();
     }
 
     /**
      * @throws DebugBarException
      */
-    public function boot()
+    private function boot()
     {
-        if ($this->booted) {
+        $this->extensionConfiguration = $this->objectManager
+            ->get(ExtensionConfiguration::class)
+            ->get(self::EXTENSION_KEY);
+
+
+        if ($this->booted || !$this->isEnabled()) {
             return;
         }
 
-        /** @var DebugBar $debugBar */
-        $debugBar = $this;
 
         if ($this->shouldCollect('info')) {
             try {
@@ -111,8 +127,9 @@ class Typo3DebugBar extends DebugBar implements SingletonInterface
 
         if ($this->shouldCollect('time')) {
             try {
+                /** @var DebugBar $debugBar */
+                $debugBar = $this;
                 $this->addCollector(new TimeDataCollector());
-
                 $debugBar->startMeasure('application', 'Application');
             } catch (DebugBarException $e) {
                 $this->addThrowable(
@@ -264,6 +281,26 @@ class Typo3DebugBar extends DebugBar implements SingletonInterface
     }
 
     /**
+     * Utility function to measure the execution of a Closure
+     *
+     * @param $label
+     * @param \Closure $closure
+     * @throws DebugBarException
+     */
+    public function debugTwig($data)
+    {
+        if (!$this->hasCollector('TraceableTwigEnvironment')) {
+            try {
+                $this->addCollector(new TwigCollector($data));
+            } catch (DebugBarException $e) {
+                $this->addThrowable(
+                    new Exception('Can not add InfoCollector to TYPO3 DebugBar:' . $e->getMessage(), $e->getCode(), $e)
+                );
+            }
+        }
+    }
+
+    /**
      * Adds an exception to be profiled in the debug bar
      *
      * @param Exception $e
@@ -280,20 +317,22 @@ class Typo3DebugBar extends DebugBar implements SingletonInterface
 
     public function shouldCollect($name)
     {
-        return (bool) $this->extensionConfiguration[$name]['value'];
+        return (bool)$this->extensionConfiguration[$name];
     }
 
     public function hasRenderWithParams()
     {
-        return (bool) $this->extensionConfiguration['with_params']['value'];
+        return (bool)$this->extensionConfiguration['with_params'];
     }
 
     public function isEnabled()
     {
         if ($this->enabled === null) {
-            $isEnabled = (bool) $this->extensionConfiguration['enabled']['value'];
-
-            $this->enabled = $this->isFrontendMode() && $this->isAdminLoggedIn() && $isEnabled;
+            $isEnabled = (bool)$this->extensionConfiguration['enabled'];
+            // todo why only for FE?
+            // todo why only id logged in? I need to debug also if logged out.
+            // restrict enable to certain local ip!
+            $this->enabled = $this->isFrontendMode() && $isEnabled;
         }
 
         return $this->enabled;
@@ -317,20 +356,14 @@ class Typo3DebugBar extends DebugBar implements SingletonInterface
         $typoScriptFrontendController->content = str_ireplace('</body>', $this->getAssetRenderer()->render() . '</body>', $typoScriptFrontendController->content);
     }
 
-    /**
-     * @return bool
-     */
-    private function isFrontendMode()
-    {
-        return TYPO3_MODE === 'FE';
-    }
+
 
     /**
      * Returns the current BE user.
      *
      * @return \TYPO3\CMS\Backend\FrontendBackendUserAuthentication
      */
-    private function getBackendUser()
+    public function getBackendUser()
     {
         return $this->backendUser;
     }
@@ -356,7 +389,7 @@ class Typo3DebugBar extends DebugBar implements SingletonInterface
     {
         $messageLevels = ['emergency', 'alert', 'critical', 'error', 'warning', 'notice', 'info', 'debug', 'log'];
         if (in_array($method, $messageLevels)) {
-            foreach($args as $arg) {
+            foreach ($args as $arg) {
                 $this->addMessage($arg, $method);
             }
         }
@@ -373,6 +406,7 @@ class Typo3DebugBar extends DebugBar implements SingletonInterface
      */
     public function addMessage($message, $label = 'info')
     {
+
         if ($this->hasCollector('messages')) {
             /** @var \DebugBar\DataCollector\MessagesCollector $collector */
             $collector = $this->getCollector('messages');
@@ -391,8 +425,18 @@ class Typo3DebugBar extends DebugBar implements SingletonInterface
         if ($this->hasCollector('vardump')) {
             /** @var VarDumpCollector $collector */
             $collector = $this->getCollector('vardump');
-            $collector->addVarDump($item);
+            $collector->addVarDump($item, 'info');
         }
+    }
+
+    /**
+     * getJavascriptRenderer
+     *
+     * @return \Konafets\Typo3Debugbar\AssetsRenderer
+     */
+    public function getJavascriptRenderer($baseUrl = null, $basePath = null): AssetsRenderer
+    {
+        return $this->getAssetRenderer($baseUrl, $basePath);
     }
 
     /**
@@ -404,10 +448,47 @@ class Typo3DebugBar extends DebugBar implements SingletonInterface
      */
     public function getAssetRenderer($baseUrl = null, $basePath = null)
     {
+        $this->count++;
+
         if ($this->jsRenderer === null) {
             $this->jsRenderer = new AssetsRenderer($this, $baseUrl, $basePath);
         }
 
         return $this->jsRenderer;
     }
+
+
+
+    /* todo put to a static utility */
+
+    /**
+     * @return bool
+     */
+    private function isFrontendMode(
+    ): bool {
+        return $this->resolveContext() === 'FE';
+    }
+
+    /**
+     * This method detect the current context and return one of the
+     * following strings:
+     * - FE
+     * - BE
+     * - CLI
+     *
+     * @return string
+     */
+    private function resolveContext(): string
+    {
+        $context = '';
+        if (Environment::isCli()) {
+            $context = 'CLI';
+        } elseif (TYPO3_REQUESTTYPE & TYPO3_REQUESTTYPE_BE) {
+            $context = 'BE';
+        } elseif (TYPO3_REQUESTTYPE & TYPO3_REQUESTTYPE_FE) {
+            $context = 'FE';
+        }
+        return $context;
+    }
+
 }

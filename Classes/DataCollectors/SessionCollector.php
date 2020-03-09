@@ -3,6 +3,7 @@
 use DebugBar\DataCollector\DataCollector;
 use DebugBar\DataCollector\DataCollectorInterface;
 use DebugBar\DataCollector\Renderable;
+use TYPO3\CMS\Core\Utility\ArrayUtility;
 
 /**
  * Class SessionCollector
@@ -15,9 +16,26 @@ class SessionCollector extends DataCollector implements DataCollectorInterface, 
      *
      * @return array Collected data
      */
-    function collect()
+    public function collect()
     {
-        return $this->getSession();
+        //return [];
+        $sessionData =  $this->getSession();
+        if (isset($sessionData['FE']['ses_data'])) {
+            $sessionData['FE']['ses_data'] = \unserialize($sessionData['FE']['ses_data']);
+        }
+
+        if (isset($sessionData['BE']['ses_data'])) {
+            $sessionData['BE']['ses_data'] = \unserialize($sessionData['BE']['ses_data']);
+        }
+        if (isset($sessionData['BE']['uc'])) {
+            $sessionData['BE']['uc'] = \unserialize($sessionData['BE']['uc']);
+        }
+
+
+        ArrayUtility::removeNullValuesRecursive($sessionData);
+
+        return $sessionData;
+
     }
 
     /**
@@ -25,7 +43,7 @@ class SessionCollector extends DataCollector implements DataCollectorInterface, 
      *
      * @return string
      */
-    function getName()
+    public function getName()
     {
         return 'session';
     }
@@ -36,16 +54,16 @@ class SessionCollector extends DataCollector implements DataCollectorInterface, 
      *
      * @return array
      */
-    function getWidgets()
+    public function getWidgets()
     {
         $name = $this->getName();
 
         return [
             "$name" => [
                 'icon' => 'archive',
-                'widget' => 'PhpDebugBar.Widgets.VariableListWidget',
+                'widget' => 'PhpDebugBar.Widgets.SessionWidget',
                 'map' => 'session',
-                "default" => '[]',
+                'default' => '[]',
             ],
         ];
     }
@@ -55,6 +73,17 @@ class SessionCollector extends DataCollector implements DataCollectorInterface, 
      */
     private function getSession()
     {
-        return $GLOBALS['TSFE']->fe_user->getSession();
+        if (TYPO3_REQUESTTYPE & TYPO3_REQUESTTYPE_FE) {
+            //return $GLOBALS['TSFE']->fe_user->getSession();
+            return [
+                'FE' => $GLOBALS['TSFE']->fe_user->fetchUserSession(),
+                'BE' => $GLOBALS['BE_USER']->fetchUserSession()
+            ];
+        }
+        if (TYPO3_REQUESTTYPE & TYPO3_REQUESTTYPE_BE) {
+            return [
+                'BE' => $GLOBALS['BE_USER']->fetchUserSession()
+            ];
+        }
     }
 }

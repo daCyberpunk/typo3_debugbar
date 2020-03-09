@@ -87,7 +87,7 @@ class MySqliCollector extends BaseCollector implements DataCollectorInterface, R
     function collect()
     {
         $totalTime = 0;
-        $queries = $this->sqlLogger->queries;
+        $queries = $this->sqlLogger->queries ?? [];
         $statements = [];
 
         foreach ($queries as $query) {

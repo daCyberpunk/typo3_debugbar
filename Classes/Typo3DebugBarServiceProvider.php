@@ -1,4 +1,5 @@
-<?php namespace Konafets\Typo3Debugbar;
+<?php
+namespace Konafets\Typo3Debugbar;
 
 use Doctrine\DBAL\Logging\DebugStack;
 use Konafets\Typo3Debugbar\DataCollectors\MySqliCollector;
@@ -11,10 +12,7 @@ class Typo3DebugBarServiceProvider
 
     public function register(array $params)
     {
-        GeneralUtility::setSingletonInstance(
-            Typo3DebugBar::class,
-            GeneralUtility::makeInstance(Typo3DebugBar::class, $params['BE_USER'])
-        );
+        return GeneralUtility::makeInstance(Typo3DebugBar::class, $params['BE_USER']);
     }
 
     /**
@@ -27,6 +25,8 @@ class Typo3DebugBarServiceProvider
         if ($debugBar->isEnabled()) {
             $debugBar->boot();
         }
+
+        return $debugBar;
     }
 
     /**
@@ -35,6 +35,7 @@ class Typo3DebugBarServiceProvider
      */
     public function addAssets(array $params, PageRenderer $pageRenderer)
     {
+
         /** @var Typo3DebugBar $debugBar */
         $debugBar = GeneralUtility::makeInstance(Typo3DebugBar::class);
         if ($debugBar->isEnabled()) {

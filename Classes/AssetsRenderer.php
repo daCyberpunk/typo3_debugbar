@@ -3,10 +3,10 @@
 use DebugBar\DebugBar;
 use DebugBar\JavascriptRenderer;
 use TYPO3\CMS\Core\Utility\ExtensionManagementUtility;
+use TYPO3\CMS\Core\Utility\PathUtility;
 
 class AssetsRenderer extends JavascriptRenderer
 {
-
     const PATH_TO_STYLES = 'Resources/Public/Css';
     const PATH_TO_JAVASCRIPT = 'Resources/Public/JavaScript';
     const CUSTOM_CSS_STYLE_FILENAME = '/typo3_debugbar.css';
@@ -29,6 +29,8 @@ class AssetsRenderer extends JavascriptRenderer
 
         $this->pathToCssAssetFile = 'typo3temp/tx_typo3_debugbar_styles.css';
         $this->pathToJsAssetFile = 'typo3temp/tx_typo3_debugbar_javascript.js';
+        //$this->pathToCssAssetFile = 'typo3temp/assets/css/tx_typo3_debugbar_styles.css';
+        //$this->pathToJsAssetFile = 'typo3temp/assets/js/tx_typo3_debugbar_javascript.js';
 
         $this->cssVendors['fontawesome'] = $extensionPath . 'Resources/Public/vendor/font-awesome/style.css';
         $this->cssFiles['typo3'] = $extensionPath . self::PATH_TO_STYLES . self::CUSTOM_CSS_STYLE_FILENAME;
@@ -55,5 +57,42 @@ class AssetsRenderer extends JavascriptRenderer
         }
 
         return $html;
+    }
+
+    /**
+     * Write assets to standard output or in a file
+     *
+     * @param array|null $files Filenames containing assets
+     * @param array|null $content Inline content to dump
+     * @param string $targetFilename
+     * @param bool $useRequireJs
+     */
+    protected function dumpAssets($files = null, $content = null, $targetFilename = null, $useRequireJs = false)
+    {
+        $dumpedContent = '';
+        $dumpedFiles = [];
+        $dumpedFiles[] = '';
+        if ($files) {
+            foreach ($files as $file) {
+                $dumpedFiles[] = PathUtility::getAbsoluteWebPath($file);
+                $dumpedContent .= file_get_contents($file) . "\n";
+            }
+            $dumpedFiles[] = '';
+            $dumpedContent = '/*' . implode(LF, $dumpedFiles) . '*/' . $dumpedContent;
+        }
+
+        if ($content) {
+            foreach ($content as $item) {
+                $dumpedContent .= $item . "\n";
+            }
+        }
+        if ($useRequireJs) {
+            $dumpedContent = "define('debugbar', ['jquery'], function($){\r\n" . $dumpedContent . "\r\n return PhpDebugBar; \r\n});";
+        }
+        if ($targetFilename !== null) {
+            file_put_contents($targetFilename, $dumpedContent);
+        } else {
+            echo $dumpedContent;
+        }
     }
 }

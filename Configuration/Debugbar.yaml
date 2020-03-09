@@ -1,0 +1,7 @@
+Debugbar:
+  Classmap:
+    addMessage:
+      - Psr\Http\Message\ServerRequestInterface
+  Typemap:
+    php: var_dump
+    json: var_dump

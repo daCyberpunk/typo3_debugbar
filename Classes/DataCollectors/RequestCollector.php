@@ -10,7 +10,7 @@ use TYPO3\CMS\Core\Utility\ExtensionManagementUtility;
  *
  * @author Stefano Kowalke <info@arroba-it.de>
  */
-class VarDumpCollector extends MessagesCollector
+class RequestCollector extends MessagesCollector
 {
 
     /**
@@ -18,7 +18,7 @@ class VarDumpCollector extends MessagesCollector
      *
      * @param string $name
      */
-    public function __construct($name = 'vardump')
+    public function __construct($name = 'request')
     {
         parent::__construct($name);
     }
@@ -30,10 +30,10 @@ class VarDumpCollector extends MessagesCollector
      */
     public function getName()
     {
-        return 'vardump';
+        return 'request';
     }
 
-    public function addVarDump($item, $label = 'info')
+    public function addVarDump($item, $label = 'request')
     {
         $this->addMessage($item, $label);
     }

@@ -95,9 +95,17 @@ dl.phpdebugbar-widgets-kvlist dt {
 
 dl.phpdebugbar-widgets-kvlist dd {
     min-height: 20px;
-    margin-left: 210px;
+    margin-left: 0;
     padding: 7px 5px;
     line-height: 20px;
+}
+dl.phpdebugbar-widgets-kvlist dd {
+    float: left;
+}
+
+dl.phpdebugbar-widgets-kvlist dl.phpdebugbar-widgets-kvlist {
+    margin-left: -50%;
+    margin-top: 7%;
 }
 
 ul.phpdebugbar-widgets-timeline .phpdebugbar-widgets-measure {
@@ -469,3 +477,5 @@ ul.phpdebugbar-widgets-cache a.phpdebugbar-widgets-forget {
     color: #fff;
     text-shadow: none;
 }
+
+
